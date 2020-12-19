@@ -96,7 +96,10 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
 
         # Sort by keyword occurrence
         sorted_word_count_pairs = sorted(word_count_pairs, key=lambda x: x[0], reverse=True)
-        for i in range(15):
+        top_range = len(sorted_word_count_pairs)
+        if top_range >= 15:
+            top_range = 15
+        for i in range(top_range):
             yield genre, sorted_word_count_pairs[i]
 
     def steps(self):
