@@ -69,7 +69,7 @@ class TopTenCustomers(MRJob):
         """
         This reducer gets the top 10 client with the higher total revenue per year
         :param year
-        :param revenue_customer_pair: each item of revenue_customer_pair is (revenue, customer),
+        :param revenue_customer_pair: each item of revenue_customer_pair is (revenue, customer)
         :return: (key=revenue, value=customer) 15 times
         """
 
