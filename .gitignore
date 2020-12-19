@@ -10,6 +10,7 @@
 4_MATRIX/A.txt
 4_MATRIX/B.txt
 4_MATRIX/C.txt
+4_MATRIX/C_computed.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
