@@ -33,6 +33,15 @@ class MatrixMatrixMultiplication(MRJob):
         # ex. .../A.txt -> 'A'
         matrix_name = os.path.splitext(os.path.basename(input_path))[0]
 
+        # Checking if the input matrices have the defined shapes in the section "CONSTANTS" above
+        if matrix_name == A_NAME:
+            assert matrix.shape == (A_ROWS, A_COLUMNS), "Matrix " + A_NAME + " with shape " + str(matrix.shape) + \
+                                                        " does not fit the defined shape " + str((A_ROWS, A_COLUMNS))
+
+        if matrix_name == B_NAME:
+            assert matrix.shape == (B_ROWS, B_COLUMNS), "Matrix " + B_NAME + " with shape " + str(matrix.shape) + \
+                                                        " does not fit the defined shape " + str((B_ROWS, B_COLUMNS))
+
         yield matrix_name, matrix.tolist()
 
     def mapper_matrix_elements(self, matrix_name, matrix):
