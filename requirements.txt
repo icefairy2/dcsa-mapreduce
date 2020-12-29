@@ -1,3 +1,3 @@
 nltk~=3.5
 mrjob~=0.7.4
-numpy~=1.19.3
+numpy==1.19.3
