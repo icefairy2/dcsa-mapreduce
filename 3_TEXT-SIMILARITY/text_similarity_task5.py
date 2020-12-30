@@ -1,0 +1,154 @@
+import json
+import sys
+
+from mrjob.job import MRJob
+from mrjob.protocol import JSONValueProtocol
+from mrjob.step import MRStep
+
+from nltk.tokenize import sent_tokenize, word_tokenize
+import gensim
+from gensim.models import Word2Vec
+from gensim import corpora
+from gensim import models
+from numpy import dot
+from numpy.linalg import norm
+
+INPUT_PROTOCOL = JSONValueProtocol
+
+random_paper = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]", "day": 1, "id": "1802.00209v1", "link": "[{'rel': 'alternate', 'href': 'http://arxiv.org/abs/1802.00209v1', 'type': 'text/html'}, {'rel': 'related', 'href': 'http://arxiv.org/pdf/1802.00209v1', 'type': 'application/pdf', 'title': 'pdf'}]", "month": 2, "summary": "We propose an architecture for VQA which utilizes recurrent layers to\ngenerate visual and textual attention. The memory characteristic of the\nproposed recurrent attention units offers a rich joint embedding of visual and\ntextual features and enables the model to reason relations between several\nparts of the image and question. Our single model outperforms the first place\nwinner on the VQA 1.0 dataset, performs within margin to the current\nstate-of-the-art ensemble model. We also experiment with replacing attention\nmechanisms in other state-of-the-art models with our implementation and show\nincreased accuracy. In both cases, our recurrent attention mechanism improves\nperformance in tasks requiring sequential or relational reasoning on the VQA\ndataset.", "tag": "[{'term': 'cs.AI', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CL', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CV', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.NE', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'stat.ML', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}]", "title": "Dual Recurrent Attention Units for Visual Question Answering", "year": 2018}
+
+
+class SimilarPaperRecommendations(MRJob):
+
+    def mapper_paper_summary(self, _, line):
+        """
+        TODO
+        This mapper yields the paper id and the paper summary for each paper in the JSON, and initializes the cosine similarity of each paper to 0
+        :param _: None
+        :param line: one line from the input file
+        :return: ((paper_id, paper_summary), cosine_similarity = 0)
+        """
+
+        # For input file type JSON, get the id and the summary of all the papers
+        paper_data = json.loads(line)
+        paper_id = paper_data["id"]
+        paper_summary = paper_data["summary"]
+
+        # Set all the papers' cosine similarity to 0
+        yield (paper_id, paper_summary), 0
+
+    def mapper_compute_cosine_similarity(self, paper_pair, cosine_similarity):
+        """
+        this mapper computes the cosine similarity between a random paper (given) and each paper in the JSON
+        and yields the paper id, paper summary, and the cosine similarity between this paper and the randomly given paper
+        :param paper_pair: (paper_id, paper_summary)
+        :param cosine_similarity: 0
+        :return: ((paper_id, paper_summary), cosine_similarity)
+        """
+
+        random_paper_id = random_paper["id"]
+        random_paper_summary = random_paper["summary"]
+        random_paper_summary = random_paper_summary.replace("\n", " ")
+        paper_summary = paper_pair[1].replace("\n", " ")
+
+        random_data = []
+        # iterate through each sentence in the random paper summary
+        for i in sent_tokenize(random_paper_summary):
+            temp = []
+
+            # tokenize the sentence into words
+            for j in word_tokenize(i):
+                temp.append(j.lower())
+
+            random_data.append(temp)
+
+        # compute the dictionary of words for the random paper
+        random_paper_dictionary = corpora.Dictionary(random_data)
+        # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
+        random_corpus = [random_paper_dictionary.doc2bow(sentence) for sentence in random_data]
+        # compute the TF-IDF model for the random paper
+        random_tfidf = models.TfidfModel(random_corpus)
+
+        # in random_rslt, return a vector containing the total score each word that appears in the random paper
+        random_vec = []
+        for document in random_tfidf[random_corpus]:
+            for word, score in document:
+                random_vec.append((word, score))
+        num_dict = {}
+        for t in random_vec:
+            if t[0] in num_dict:
+                num_dict[t[0]] = num_dict[t[0]] + t[1]
+            else:
+                num_dict[t[0]] = t[1]
+        random_rslt = list(num_dict.values())
+
+        paper_data = []
+        # iterate through each sentence in the paper summary
+        for i in sent_tokenize(paper_summary):
+            temp = []
+
+            # tokenize the sentence into words
+            for j in word_tokenize(i):
+                temp.append(j.lower())
+
+            paper_data.append(temp)
+
+        # compute the dictionary of words for each paper
+        paper_dictionary = corpora.Dictionary(paper_data)
+        # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
+        paper_corpus = [paper_dictionary.doc2bow(sentence) for sentence in paper_data]
+        # compute the TF-IDF model for each paper
+        paper_tfidf = models.TfidfModel(paper_corpus)
+
+        # in paper_rslt, return a vector containing the total score each word that appears in each paper
+        paper_vec = []
+        for document in paper_tfidf[random_corpus]:
+            for word, score in document:
+                paper_vec.append((word, score))
+        num_dict = {}
+        for t in paper_vec:
+            if t[0] in num_dict:
+                num_dict[t[0]] = num_dict[t[0]] + t[1]
+            else:
+                num_dict[t[0]] = t[1]
+        paper_rslt = list(num_dict.values())
+
+        # compute the cosine similarity between each paper and the randomly selected paper
+        cosine_similarity = dot(random_rslt, paper_rslt) / (norm(random_rslt) * norm(paper_rslt))
+
+        yield paper_pair, cosine_similarity
+
+    def reducer_paper_similarity(self, paper_pair, cosine_similarity):
+        """
+        This reducer sends all (cosine_similarity, paper_pair) constructs to the next step
+        :param paper_pair: the paper that was compared to the random input
+        :param cosine_similarity: the cosine similarity between the random paper and the paper referred to in paper_pair
+        :return: (None, (cosine_similarity, paper_pair)
+        """
+        yield None, (cosine_similarity, paper_pair)
+
+    def reducer_find_highest_similarity(self, _, similarity_paper_pair):
+        """
+        This reducer orders the list of papers by their similarity compared with the randomly selected paper and
+        returns the paper which is most similar to the randomly selected paper
+        :param _: None
+        :param similarity_paper_pair:(cosine_similarity, (paper_id, paper_summary))
+        :return: sorted_similarity_paper_pairs[0]: the (cosine_similarity, (paper_id, paper_summary)) construct for the
+        paper with the highest similary compared to the randomly selected paper
+        """
+
+        # Sort by cosine similarity of the paper
+        sorted_similarity_paper_pairs = sorted(similarity_paper_pair, key=lambda x: x[0], reverse=True)
+        yield sorted_similarity_paper_pairs[0]
+
+
+    def steps(self):
+        return [
+            MRStep(mapper=self.mapper_paper_summary),
+            MRStep(mapper=self.mapper_compute_cosine_similarity,
+                   reducer=self.reducer_paper_similarity),
+            MRStep(reducer=self.reducer_find_highest_similarity)
+        ]
+
+if __name__ == '__main__':
+    SimilarPaperRecommendations.run()
