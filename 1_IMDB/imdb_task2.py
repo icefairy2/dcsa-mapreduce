@@ -86,7 +86,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         """
         yield (genre_keyword_pair, sum(counts))
 
-
     def reducer_count_words(self, genre_keyword_pair, counts):
         """
         This reducer sends all (num_occurrences, (genre, keyword)) constructs to the next step
@@ -95,7 +94,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: (None, (sum(counts), genre_keyword_pair))
         """
         yield None, (sum(counts), genre_keyword_pair)
-
 
     def mapper_keyword_counts_by_genre(self, _, counts_genre_keyword_pair):
         """
@@ -108,7 +106,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         genre = counts_genre_keyword_pair[1][0]
         keyword = counts_genre_keyword_pair[1][1]
         yield genre, (count, keyword)
-
 
     def reducer_find_top_fifteen_words_by_genre(self, genre, word_count_pairs):
         """
@@ -125,7 +122,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
             top_range = 15
         for i in range(top_range):
             yield genre, sorted_word_count_pairs[i]
-
 
     def steps(self):
         return [

@@ -2,3 +2,5 @@ nltk~=3.5
 mrjob~=0.7.4
 numpy==1.19.3
 gensim~=3.8.3
+spacy~=2.3.5
+spacy_langdetect~=0.1.2

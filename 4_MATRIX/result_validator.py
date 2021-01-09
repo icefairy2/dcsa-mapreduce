@@ -4,7 +4,7 @@ import numpy as np
 
 EXPECTED_MATRIX_PATH = 'C.txt'
 
-# Assuming the task was run by for example 'python matrix_task6.py A.txt B.txt >
+# Assuming the task was run by for example 'python matrix_task6.py A.txt B.txt > C_computed.txt'
 RESULTED_MATRIX_PATH = 'C_computed.txt'
 
 RESULTED_LINE_REGEX = re.compile(r'\[(\d+), (\d+)\]\t(.*)$')

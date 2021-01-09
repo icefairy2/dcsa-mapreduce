@@ -11,6 +11,7 @@ nltk.download('stopwords')
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
 
+
 # Stopwords are used to determine the language
 # The method to detect the English language using NLTK can be found here:
 # https://www.algorithm.co.il/programming/python/cheap-language-detection-nltk/
@@ -24,7 +25,6 @@ def is_english(text):
     text = text.lower()
     words = set(nltk.wordpunct_tokenize(text))
     return len(words & ENGLISH_STOPWORDS) > len(words & NON_ENGLISH_STOPWORDS)
-
 
 class MostCommonKeyWordsIMDB(MRJob):
 
@@ -46,7 +46,6 @@ class MostCommonKeyWordsIMDB(MRJob):
         primary_title = attributes[2]
 
         if title_type in ('short', 'movie'):
-
             if is_english(primary_title):
                 for word in WORD_RE.findall(primary_title):
 
