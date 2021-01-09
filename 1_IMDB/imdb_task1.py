@@ -10,6 +10,12 @@ import en_core_web_sm
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
 
+# Load language processing related models
+NLP = spacy.load('en_core_web_sm')
+NLP_FR = fr_core_news_sm.load()
+NLP_EN = en_core_web_sm.load()
+NLP.add_pipe(LanguageDetector(), name='language_detector', last=True)
+
 
 class MostCommonKeyWordsIMDB(MRJob):
 
@@ -31,17 +37,14 @@ class MostCommonKeyWordsIMDB(MRJob):
         primary_title = attributes[2]
 
         if title_type in ('short', 'movie'):
-            nlp = spacy.load('en_core_web_sm')
-            nlp_fr = fr_core_news_sm.load()
-            nlp_eng = en_core_web_sm.load()
-            nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
 
-            doc = nlp(primary_title)
+            # Detect the language of the title to correctly annotate the parts of speech
+            doc = NLP(primary_title)
             lang = doc._.language.get("language")
             if lang == 'en':
-                doc = nlp_eng(primary_title)
+                doc = NLP_EN(primary_title)
             else:
-                doc = nlp_fr(primary_title)
+                doc = NLP_FR(primary_title)
 
             for w in doc:
                 if w.pos_ not in ('ADP', 'AUX', 'CONJ', 'CCONJ', 'DET', 'PUNCT', 'SCONJ', 'SYM', 'PART', 'X'):

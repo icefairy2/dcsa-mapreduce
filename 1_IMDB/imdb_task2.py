@@ -10,6 +10,12 @@ import en_core_web_sm
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
 
+# Load language processing related models
+NLP = spacy.load('en_core_web_sm')
+NLP_FR = fr_core_news_sm.load()
+NLP_EN = en_core_web_sm.load()
+NLP.add_pipe(LanguageDetector(), name='language_detector', last=True)
+
 
 class MostCommonKeyWordsByGenreIMDB(MRJob):
 
@@ -44,22 +50,17 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: ((genre, keyword), 1)
         """
 
-        nlp = spacy.load('en_core_web_sm')
-        nlp_fr = fr_core_news_sm.load()
-        nlp_eng = en_core_web_sm.load()
-        nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
-
-        doc = nlp(title)
+        # Detect the language of the title to correctly annotate the parts of speech
+        doc = NLP(title)
         lang = doc._.language.get("language")
         if lang == 'en':
-            doc = nlp_eng(title)
+            doc = NLP_EN(title)
         else:
-            doc = nlp_fr(title)
+            doc = NLP_FR(title)
 
         for w in doc:
             if w.pos_ not in ('ADP', 'AUX', 'CONJ', 'CCONJ', 'DET', 'PUNCT', 'SCONJ', 'SYM', 'PART', 'X'):
                 yield (genre, w.text.lower()), 1
-
 
     def combiner_count_words(self, genre_keyword_pair, counts):
         """
@@ -70,7 +71,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         """
         yield (genre_keyword_pair, sum(counts))
 
-
     def reducer_count_words(self, genre_keyword_pair, counts):
         """
         This reducer sends all (num_occurrences, (genre, keyword)) constructs to the next step
@@ -79,7 +79,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: (None, (sum(counts), genre_keyword_pair))
         """
         yield None, (sum(counts), genre_keyword_pair)
-
 
     def mapper_keyword_counts_by_genre(self, _, counts_genre_keyword_pair):
         """
@@ -92,7 +91,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         genre = counts_genre_keyword_pair[1][0]
         keyword = counts_genre_keyword_pair[1][1]
         yield genre, (count, keyword)
-
 
     def reducer_find_top_fifteen_words_by_genre(self, genre, word_count_pairs):
         """
@@ -109,7 +107,6 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
             top_range = 15
         for i in range(top_range):
             yield genre, sorted_word_count_pairs[i]
-
 
     def steps(self):
         return [
