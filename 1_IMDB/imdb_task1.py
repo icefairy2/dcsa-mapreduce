@@ -1,4 +1,3 @@
-import nltk
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 import re
@@ -7,8 +6,6 @@ import spacy
 from spacy_langdetect import LanguageDetector
 import fr_core_news_sm
 import en_core_web_sm
-# The required dataset for NLTK part of speech tagger
-nltk.download('averaged_perceptron_tagger')
 
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
@@ -34,16 +31,6 @@ class MostCommonKeyWordsIMDB(MRJob):
         primary_title = attributes[2]
 
         if title_type in ('short', 'movie'):
-            # for word in WORD_RE.findall(primary_title):
-            #
-            #     # Filter out auxiliary verbs, prepositions, articles and conjunctions
-            #     # Available parts of speech can be listed with nltk.help.upenn_tagset()
-            #     # List also available at the official documentation:
-            #     # https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
-            #     nltk_tagged_word = nltk.pos_tag([word])
-            #     part_of_speech = nltk_tagged_word[0][1]
-            #
-            #     if part_of_speech not in ('IN', 'RP', 'CC', 'MD', 'DT', 'PDT', 'TO'):
             nlp = spacy.load('en_core_web_sm')
             nlp_fr = fr_core_news_sm.load()
             nlp_eng = en_core_web_sm.load()
