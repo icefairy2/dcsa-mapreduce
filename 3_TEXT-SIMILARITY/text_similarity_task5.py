@@ -28,30 +28,38 @@ random_result = {}
 def compute_random_paper_aspects():
     """
     This method computes the computationally relevant data on the given random paper
-    :return:
+    :return: random_result: the text to vec representation of the random paper's summary
     """
+
     random_paper_summary = RANDOM_PAPER["summary"]
     random_paper_summary = random_paper_summary.replace("\n", " ")
     random_data = []
-    # iterate through each sentence in the random paper summary
+    # Iterate through each sentence in the random paper summary
     for i in sent_tokenize(random_paper_summary):
         temp = []
 
-        # tokenize the sentence into words
+        # Tokenize the sentence into words
         for j in word_tokenize(i):
             temp.append(j.lower())
 
         random_data.append(temp)
-    # compute the dictionary of words for the random paper
+    # Compute the dictionary of words for the random paper
     random_paper_dictionary = corpora.Dictionary(random_data)
-    # compute a dictionary of words in their alphabetical order and their index in this order
+
+    # From the dictionary of words, form a new dictionary of words in
+    # their alphabetical order and their index in this alphabetical order
     random_paper_vector = random_paper_dictionary.token2id
-    # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
+
+    # For each sentence, convert each word into a tuple with the
+    # following structure: word_id, nb of times that a word appears in the sentence
     random_corpus = [random_paper_dictionary.doc2bow(sentence) for sentence in random_data]
-    # compute the TF-IDF model for the random paper
+
+    # Compute the TF-IDF model for the random paper to obtain the term frequency
+    # in the summary with respect to the length of the summary
     random_tfidf = models.TfidfModel(random_corpus)
-    # in random_result, return a dictionary containing the words in their alphabetical order and
-    # the total score of each word that appears in the random paper
+
+    # In random_result, return a dictionary containing the words in their alphabetical
+    # order and the total TF-IDF score of each word that appears in the random paper
     random_vec = []
     for document in random_tfidf[random_corpus]:
         for word, score in document:
@@ -88,8 +96,9 @@ class SimilarPaperRecommendations(MRJob):
 
     def mapper_compute_cosine_similarity(self, paper_id, paper_summary):
         """
-        This mapper computes the cosine similarity between a random paper (given) and each paper in the JSON
-        and yields the paper id, paper summary, and the cosine similarity between this paper and the randomly given paper
+        This mapper computes the cosine similarity between a random paper (given)
+        and each paper in the JSON and yields the paper id, paper summary,
+        and the cosine similarity between this paper and the randomly given paper
         :param paper_id: unique id as defined in the input data
         :param paper_summary: corresponding paper summary
         :return: ((paper_id, paper_summary), cosine_similarity)
@@ -99,27 +108,33 @@ class SimilarPaperRecommendations(MRJob):
         paper_summary = paper_summary.replace("\n", " ")
 
         paper_data = []
-        # iterate through each sentence in the paper summary
+        # Iterate through each sentence in the paper summary
         for i in sent_tokenize(paper_summary):
             temp = []
 
-            # tokenize the sentence into words
+            # Tokenize the sentence into words
             for j in word_tokenize(i):
                 temp.append(j.lower())
 
             paper_data.append(temp)
 
-        # compute the dictionary of words for each paper
+        # Compute the dictionary of words for each paper
         paper_dictionary = corpora.Dictionary(paper_data)
-        # compute a dictionary of words in their alphabetical order and their index in this order
+
+        # From the dictionary of words, form a new dictionary of words in
+        # their alphabetical order and their index in this alphabetical order
         paper_vector = paper_dictionary.token2id
-        # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
+
+        # For each sentence, convert each word into a tuple with the
+        # following structure: word_id, nb of times that a word appears in the sentence
         paper_corpus = [paper_dictionary.doc2bow(sentence) for sentence in paper_data]
-        # compute the TF-IDF model for each paper
+
+        # Compute the TF-IDF model for the paper to obtain the term frequency
+        # in the summary with respect to the length of the summary
         paper_tfidf = models.TfidfModel(paper_corpus)
 
-        # in paper_result, return a dictionary containing the words in their alphabetical order and
-        # the total score of each word that appears in each paper
+        # In paper_result, return a dictionary containing the words in their alphabetical
+        # order and the total score of each word that appears in each paper
         paper_vec = []
         for document in paper_tfidf[paper_corpus]:
             for word, score in document:
@@ -136,27 +151,36 @@ class SimilarPaperRecommendations(MRJob):
             if v in num_dict:
                 paper_result[k] = num_dict.get(v)
 
-        # compute the cosine similarity between each paper and the randomly selected paper
-        intersection = set(random_result.keys()) & set(paper_result.keys())
-        numerator = sum([random_result[x] * paper_result[x] for x in intersection])
-        sum1 = sum([random_result[x] ** 2 for x in random_result.keys()])
-        sum2 = sum([paper_result[x] ** 2 for x in paper_result.keys()])
-        denominator = math.sqrt(sum1) * math.sqrt(sum2)
-        if not denominator:
-            cosine_similarity = 0.0
-        else:
-            cosine_similarity = round(float(numerator) / denominator, 3)
+        # Compute the cosine similarity between each paper and the randomly selected paper,
+        # but avoid this computation in case the paper and the random paper are the same
+        if paper_result != random_result:
 
-        yield None, (cosine_similarity, (paper_id, paper_summary))
+            # Select the terms that are present in the paper and the random paper
+            intersection = set(random_result.keys()) & set(paper_result.keys())
+
+            # The formula used in the cosine similarity computation will be presented in
+            # the documentation
+            numerator = sum([random_result[x] * paper_result[x] for x in intersection])
+            sum1 = sum([random_result[x] ** 2 for x in random_result.keys()])
+            sum2 = sum([paper_result[x] ** 2 for x in paper_result.keys()])
+            denominator = math.sqrt(sum1) * math.sqrt(sum2)
+            if not denominator:
+                cosine_similarity = 0.0
+            else:
+                cosine_similarity = round(float(numerator) / denominator, 3)
+
+            yield None, (cosine_similarity, (paper_id, paper_summary))
 
     def reducer_find_highest_similarity(self, _, similarity_paper_pair):
         """
-        This reducer orders the list of papers by their similarity compared with the randomly selected paper and
-        returns the paper which is most similar to the randomly selected paper
+        This reducer orders the list of papers by their similarity compared with
+        the randomly selected paper and returns the paper which is most similar
+        to the randomly selected paper
         :param _: None
         :param similarity_paper_pair:(cosine_similarity, (paper_id, paper_summary))
-        :return: sorted_similarity_paper_pairs[0]: the (cosine_similarity, (paper_id, paper_summary)) construct for the
-        paper with the highest similary compared to the randomly selected paper
+        :return: sorted_similarity_paper_pairs[0]:
+        the (cosine_similarity, (paper_id, paper_summary)) construct for the paper
+        with the highest similarity compared to the randomly selected paper
         """
 
         # Sort by cosine similarity of the paper
