@@ -1,22 +1,18 @@
 import json
 import math
-import sys
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep
 
 from nltk.tokenize import sent_tokenize, word_tokenize
-# import gensim
-# from gensim.models import Word2Vec
+
 from gensim import corpora
 from gensim import models
-# from numpy import dot
-# from numpy.linalg import norm
 
 INPUT_PROTOCOL = JSONValueProtocol
 
-random_paper = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]",
+RANDOM_PAPER = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]",
                 "day": 1,
                 "id": "1802.00209v1",
                 "link": "[{'rel': 'alternate', 'href': 'http://arxiv.org/abs/1802.00209v1', 'type': 'text/html'}, {'rel': 'related', 'href': 'http://arxiv.org/pdf/1802.00209v1', 'type': 'application/pdf', 'title': 'pdf'}]",
@@ -26,15 +22,61 @@ random_paper = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]
                 "title": "Dual Recurrent Attention Units for Visual Question Answering",
                 "year": 2018}
 
+random_result = {}
+
+
+def compute_random_paper_aspects():
+    """
+    This method computes the computationally relevant data on the given random paper
+    :return:
+    """
+    random_paper_summary = RANDOM_PAPER["summary"]
+    random_paper_summary = random_paper_summary.replace("\n", " ")
+    random_data = []
+    # iterate through each sentence in the random paper summary
+    for i in sent_tokenize(random_paper_summary):
+        temp = []
+
+        # tokenize the sentence into words
+        for j in word_tokenize(i):
+            temp.append(j.lower())
+
+        random_data.append(temp)
+    # compute the dictionary of words for the random paper
+    random_paper_dictionary = corpora.Dictionary(random_data)
+    # compute a dictionary of words in their alphabetical order and their index in this order
+    random_paper_vector = random_paper_dictionary.token2id
+    # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
+    random_corpus = [random_paper_dictionary.doc2bow(sentence) for sentence in random_data]
+    # compute the TF-IDF model for the random paper
+    random_tfidf = models.TfidfModel(random_corpus)
+    # in random_result, return a dictionary containing the words in their alphabetical order and
+    # the total score of each word that appears in the random paper
+    random_vec = []
+    for document in random_tfidf[random_corpus]:
+        for word, score in document:
+            random_vec.append((word, score))
+    num_dict = {}
+    for t in random_vec:
+        if t[0] in num_dict:
+            num_dict[t[0]] = num_dict[t[0]] + t[1]
+        else:
+            num_dict[t[0]] = t[1]
+    global random_result
+    for k, v in random_paper_vector.items():
+        if v in num_dict:
+            random_result[k] = num_dict.get(v)
+    return random_result
+
 
 class SimilarPaperRecommendations(MRJob):
 
     def mapper_paper_summary(self, _, line):
         """
-        This mapper yields the paper id and the paper summary for each paper in the JSON, and initializes the cosine similarity of each paper to 0
+        This mapper yields the paper id and the paper summary for each paper in the JSON
         :param _: None
         :param line: one line from the input file
-        :return: ((paper_id, paper_summary), cosine_similarity = 0)
+        :return: (paper_id, paper_summary)
         """
 
         # For input file type JSON, get the id and the summary of all the papers
@@ -42,61 +84,19 @@ class SimilarPaperRecommendations(MRJob):
         paper_id = paper_data["id"]
         paper_summary = paper_data["summary"]
 
-        # Set all the papers' cosine similarity to 0
-        cosine_similarity = 0
-        yield (paper_id, paper_summary), cosine_similarity
+        yield paper_id, paper_summary
 
-    def mapper_compute_cosine_similarity(self, paper_pair, cosine_similarity):
+    def mapper_compute_cosine_similarity(self, paper_id, paper_summary):
         """
         This mapper computes the cosine similarity between a random paper (given) and each paper in the JSON
         and yields the paper id, paper summary, and the cosine similarity between this paper and the randomly given paper
-        :param paper_pair: (paper_id, paper_summary)
-        :param cosine_similarity: 0
+        :param paper_id: unique id as defined in the input data
+        :param paper_summary: corresponding paper summary
         :return: ((paper_id, paper_summary), cosine_similarity)
         """
 
-        random_paper_id = random_paper["id"]
-        random_paper_summary = random_paper["summary"]
-        random_paper_summary = random_paper_summary.replace("\n", " ")
-        paper_summary = paper_pair[1].replace("\n", " ")
-
-        random_data = []
-        # iterate through each sentence in the random paper summary
-        for i in sent_tokenize(random_paper_summary):
-            temp = []
-
-            # tokenize the sentence into words
-            for j in word_tokenize(i):
-                temp.append(j.lower())
-
-            random_data.append(temp)
-
-        # compute the dictionary of words for the random paper
-        random_paper_dictionary = corpora.Dictionary(random_data)
-        # compute a dictionary of words in their alphabetical order and their index in this order
-        random_paper_vector = random_paper_dictionary.token2id
-        # for each sentence, convert each word into a tuple of: word_id, nb of times that a word appears in the sentence
-        random_corpus = [random_paper_dictionary.doc2bow(sentence) for sentence in random_data]
-        # compute the TF-IDF model for the random paper
-        random_tfidf = models.TfidfModel(random_corpus)
-
-        # in random_result, return a dictionary containing the words in their alphabetical order and
-        # the total score of each word that appears in the random paper
-        random_vec = []
-        for document in random_tfidf[random_corpus]:
-            for word, score in document:
-                random_vec.append((word, score))
-        num_dict = {}
-        for t in random_vec:
-            if t[0] in num_dict:
-                num_dict[t[0]] = num_dict[t[0]] + t[1]
-            else:
-                num_dict[t[0]] = t[1]
-
-        random_result = {}
-        for k, v in random_paper_vector.items():
-            if v in num_dict:
-                random_result[k] = num_dict.get(v)
+        global random_result
+        paper_summary = paper_summary.replace("\n", " ")
 
         paper_data = []
         # iterate through each sentence in the paper summary
@@ -147,16 +147,7 @@ class SimilarPaperRecommendations(MRJob):
         else:
             cosine_similarity = round(float(numerator) / denominator, 3)
 
-        yield paper_pair, cosine_similarity
-
-    def reducer_paper_similarity(self, paper_pair, cosine_similarity):
-        """
-        This reducer sends all (cosine_similarity, paper_pair) constructs to the next step
-        :param paper_pair: the paper that was compared to the random input
-        :param cosine_similarity: the cosine similarity between the random paper and the paper referred to in paper_pair
-        :return: (None, (cosine_similarity, paper_pair)
-        """
-        yield None, (cosine_similarity, paper_pair)
+        yield None, (cosine_similarity, (paper_id, paper_summary))
 
     def reducer_find_highest_similarity(self, _, similarity_paper_pair):
         """
@@ -176,10 +167,10 @@ class SimilarPaperRecommendations(MRJob):
         return [
             MRStep(mapper=self.mapper_paper_summary),
             MRStep(mapper=self.mapper_compute_cosine_similarity,
-                   reducer=self.reducer_paper_similarity)
-            # MRStep(reducer=self.reducer_find_highest_similarity)
+                   reducer=self.reducer_find_highest_similarity)
         ]
 
 
 if __name__ == '__main__':
+    compute_random_paper_aspects()
     SimilarPaperRecommendations.run()
