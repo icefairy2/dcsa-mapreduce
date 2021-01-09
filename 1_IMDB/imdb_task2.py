@@ -3,6 +3,11 @@ from mrjob.job import MRJob
 from mrjob.step import MRStep
 import re
 
+import spacy
+from spacy_langdetect import LanguageDetector
+import fr_core_news_sm
+import en_core_web_sm
+
 # The required dataset for NLTK part of speech tagger
 nltk.download('averaged_perceptron_tagger')
 
@@ -43,18 +48,35 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: ((genre, keyword), 1)
         """
 
-        for word in WORD_RE.findall(title):
+        # for word in WORD_RE.findall(title):
 
             # Filter out auxiliary verbs, prepositions, articles and conjunctions
             # Available parts of speech can be listed with nltk.help.upenn_tagset()
             # List also available at the official documentation:
             # https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
-            nltk_tagged_word = nltk.pos_tag([word])
-            part_of_speech = nltk_tagged_word[0][1]
+            # nltk_tagged_word = nltk.pos_tag([word])
+            # part_of_speech = nltk_tagged_word[0][1]
+            #
+            # if part_of_speech not in ('IN', 'RP', 'CC', 'MD', 'DT', 'PDT', 'TO'):
+            #     # The key is (genre, keyword)
+            #     yield (genre, word.lower()), 1
 
-            if part_of_speech not in ('IN', 'RP', 'CC', 'MD', 'DT', 'PDT', 'TO'):
-                # The key is (genre, keyword)
-                yield (genre, word.lower()), 1
+        nlp = spacy.load('en_core_web_sm')
+        nlp_fr = fr_core_news_sm.load()
+        nlp_eng = en_core_web_sm.load()
+        nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
+
+        doc = nlp(title)
+        lang = doc._.language.get("language")
+        if lang == 'en':
+            doc = nlp_eng(title)
+        else:
+            doc = nlp_fr(title)
+
+        for w in doc:
+            if w.pos_ not in ('ADP', 'AUX', 'CONJ', 'CCONJ', 'DET', 'PUNCT', 'SCONJ', 'SYM', 'PART', 'X'):
+                yield (genre, w.text.lower()), 1
+
 
     def combiner_count_words(self, genre_keyword_pair, counts):
         """
@@ -65,6 +87,7 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         """
         yield (genre_keyword_pair, sum(counts))
 
+
     def reducer_count_words(self, genre_keyword_pair, counts):
         """
         This reducer sends all (num_occurrences, (genre, keyword)) constructs to the next step
@@ -73,6 +96,7 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: (None, (sum(counts), genre_keyword_pair))
         """
         yield None, (sum(counts), genre_keyword_pair)
+
 
     def mapper_keyword_counts_by_genre(self, _, counts_genre_keyword_pair):
         """
@@ -85,6 +109,7 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         genre = counts_genre_keyword_pair[1][0]
         keyword = counts_genre_keyword_pair[1][1]
         yield genre, (count, keyword)
+
 
     def reducer_find_top_fifteen_words_by_genre(self, genre, word_count_pairs):
         """
@@ -101,6 +126,7 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
             top_range = 15
         for i in range(top_range):
             yield genre, sorted_word_count_pairs[i]
+
 
     def steps(self):
         return [
