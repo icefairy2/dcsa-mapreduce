@@ -152,14 +152,16 @@ class SimilarPaperRecommendations(MRJob):
                 paper_result[k] = num_dict.get(v)
 
         # Compute the cosine similarity between each paper and the randomly selected paper,
-        # but avoid this computation in case the paper and the random paper are the same
+        # but avoid this computation in case the paper and the random paper are the same;
+        # The cosine similarity implementation was done without using a library that computes it
+        # automatically, and can be found here:
+        # https://stackoverflow.com/questions/18424228/cosine-similarity-between-2-number-lists
+        # The formula used in the cosine similarity computation will be presented in
+        # the documentation
         if paper_result != random_result:
 
             # Select the terms that are present in the paper and the random paper
             intersection = set(random_result.keys()) & set(paper_result.keys())
-
-            # The formula used in the cosine similarity computation will be presented in
-            # the documentation
             numerator = sum([random_result[x] * paper_result[x] for x in intersection])
             sum1 = sum([random_result[x] ** 2 for x in random_result.keys()])
             sum2 = sum([paper_result[x] ** 2 for x in paper_result.keys()])

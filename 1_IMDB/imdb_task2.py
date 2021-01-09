@@ -1,15 +1,27 @@
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 import re
-
-import spacy
-from spacy_langdetect import LanguageDetector
+import nltk
 import fr_core_news_sm
-import en_core_web_sm
+NLP_FR = fr_core_news_sm.load()
+
+nltk.download('stopwords')
 
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
 
+# Stopwords are used to determine the language
+# The method to detect the English language using NLTK can be found here:
+# https://www.algorithm.co.il/programming/python/cheap-language-detection-nltk/
+ENGLISH_STOPWORDS = set(nltk.corpus.stopwords.words('english'))
+NON_ENGLISH_STOPWORDS = set(nltk.corpus.stopwords.words()) - ENGLISH_STOPWORDS
+
+STOPWORDS_DICT = {lang: set(nltk.corpus.stopwords.words(lang)) for lang in nltk.corpus.stopwords.fileids()}
+
+def is_english(text):
+    text = text.lower()
+    words = set(nltk.wordpunct_tokenize(text))
+    return len(words & ENGLISH_STOPWORDS) > len(words & NON_ENGLISH_STOPWORDS)
 
 class MostCommonKeyWordsByGenreIMDB(MRJob):
 
@@ -44,22 +56,26 @@ class MostCommonKeyWordsByGenreIMDB(MRJob):
         :return: ((genre, keyword), 1)
         """
 
-        nlp = spacy.load('en_core_web_sm')
-        nlp_fr = fr_core_news_sm.load()
-        nlp_eng = en_core_web_sm.load()
-        nlp.add_pipe(LanguageDetector(), name='language_detector', last=True)
+        if is_english(title):
+            for word in WORD_RE.findall(title):
 
-        doc = nlp(title)
-        lang = doc._.language.get("language")
-        if lang == 'en':
-            doc = nlp_eng(title)
+                # Filter out auxiliary verbs, prepositions, articles and conjunctions
+                # Available parts of speech can be listed with nltk.help.upenn_tagset()
+                # List also available at the official documentation:
+                # https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
+                nltk_tagged_word = nltk.pos_tag([word])
+                part_of_speech = nltk_tagged_word[0][1]
+
+                if part_of_speech not in ('IN', 'RP', 'CC', 'MD', 'DT', 'PDT', 'TO'):
+                    yield (genre, word.lower()), 1
         else:
-            doc = nlp_fr(title)
-
-        for w in doc:
-            if w.pos_ not in ('ADP', 'AUX', 'CONJ', 'CCONJ', 'DET', 'PUNCT', 'SCONJ', 'SYM', 'PART', 'X'):
-                yield (genre, w.text.lower()), 1
-
+            # The second most common language in the input file was French, so we decided to
+            # filter out auxiliary verbs, prepositions, articles and conjunctions in French;
+            # This is done using spaCy.io
+            doc = NLP_FR(title)
+            for w in doc:
+                if w.pos_ not in ('ADP', 'AUX', 'CONJ', 'CCONJ', 'DET', 'PUNCT', 'SCONJ', 'SYM', 'PART', 'X'):
+                    yield (genre, w.text.lower()), 1
 
     def combiner_count_words(self, genre_keyword_pair, counts):
         """
