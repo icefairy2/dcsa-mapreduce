@@ -1,6 +1,7 @@
 import json
 import math
 
+import nltk
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep
@@ -23,6 +24,8 @@ RANDOM_PAPER = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]
                 "year": 2018}
 
 random_result = {}
+
+nltk.download('punkt')
 
 
 def compute_random_paper_aspects():
