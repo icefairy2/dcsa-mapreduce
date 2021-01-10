@@ -4,13 +4,15 @@ import re
 import nltk
 import fr_core_news_sm
 
+# Load the spaCy CNN for french word tagging
 NLP_FR = fr_core_news_sm.load()
 
+# Download relevant NLTK models if not already present
+nltk.download('averaged_perceptron_tagger')
 nltk.download('stopwords')
 
 # Regular expression to match words
 WORD_RE = re.compile(r"[\w']+")
-
 
 # Stopwords are used to determine the language
 # The method to detect the English language using NLTK can be found here:
@@ -25,6 +27,7 @@ def is_english(text):
     text = text.lower()
     words = set(nltk.wordpunct_tokenize(text))
     return len(words & ENGLISH_STOPWORDS) > len(words & NON_ENGLISH_STOPWORDS)
+
 
 class MostCommonKeyWordsIMDB(MRJob):
 

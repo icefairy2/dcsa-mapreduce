@@ -3,8 +3,12 @@ from mrjob.step import MRStep
 import re
 import nltk
 import fr_core_news_sm
+
+# Load the spaCy CNN for french word tagging
 NLP_FR = fr_core_news_sm.load()
 
+# Download relevant NLTK models if not already present
+nltk.download('averaged_perceptron_tagger')
 nltk.download('stopwords')
 
 # Regular expression to match words
@@ -18,10 +22,12 @@ NON_ENGLISH_STOPWORDS = set(nltk.corpus.stopwords.words()) - ENGLISH_STOPWORDS
 
 STOPWORDS_DICT = {lang: set(nltk.corpus.stopwords.words(lang)) for lang in nltk.corpus.stopwords.fileids()}
 
+
 def is_english(text):
     text = text.lower()
     words = set(nltk.wordpunct_tokenize(text))
     return len(words & ENGLISH_STOPWORDS) > len(words & NON_ENGLISH_STOPWORDS)
+
 
 class MostCommonKeyWordsByGenreIMDB(MRJob):
 

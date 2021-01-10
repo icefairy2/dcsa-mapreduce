@@ -2,29 +2,29 @@ import json
 import math
 
 import nltk
-from mrjob.job import MRJob
-from mrjob.protocol import JSONValueProtocol
-from mrjob.step import MRStep
-
-from nltk.tokenize import sent_tokenize, word_tokenize
-
 from gensim import corpora
 from gensim import models
+from mrjob.job import MRJob
+from mrjob.step import MRStep
+from nltk.tokenize import sent_tokenize, word_tokenize
 
-INPUT_PROTOCOL = JSONValueProtocol
+# Change the value of this constant to the output of script random_paper_selector.py
+RANDOM_PAPER = {
+    "author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]",
+    "day": 1,
+    "id": "1802.00209v1",
+    "link": "[{'rel': 'alternate', 'href': 'http://arxiv.org/abs/1802.00209v1', 'type': 'text/html'}, {'rel': 'related', 'href': 'http://arxiv.org/pdf/1802.00209v1', 'type': 'application/pdf', 'title': 'pdf'}]",
+    "month": 2,
+    "summary": "We propose an architecture for VQA which utilizes recurrent layers to\ngenerate visual and textual attention. The memory characteristic of the\nproposed recurrent attention units offers a rich joint embedding of visual and\ntextual features and enables the model to reason relations between several\nparts of the image and question. Our single model outperforms the first place\nwinner on the VQA 1.0 dataset, performs within margin to the current\nstate-of-the-art ensemble model. We also experiment with replacing attention\nmechanisms in other state-of-the-art models with our implementation and show\nincreased accuracy. In both cases, our recurrent attention mechanism improves\nperformance in tasks requiring sequential or relational reasoning on the VQA\ndataset.",
+    "tag": "[{'term': 'cs.AI', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CL', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CV', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.NE', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'stat.ML', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}]",
+    "title": "Dual Recurrent Attention Units for Visual Question Answering",
+    "year": 2018
+}
 
-RANDOM_PAPER = {"author": "[{'name': 'Ahmed Osman'}, {'name': 'Wojciech Samek'}]",
-                "day": 1,
-                "id": "1802.00209v1",
-                "link": "[{'rel': 'alternate', 'href': 'http://arxiv.org/abs/1802.00209v1', 'type': 'text/html'}, {'rel': 'related', 'href': 'http://arxiv.org/pdf/1802.00209v1', 'type': 'application/pdf', 'title': 'pdf'}]",
-                "month": 2,
-                "summary": "We propose an architecture for VQA which utilizes recurrent layers to\ngenerate visual and textual attention. The memory characteristic of the\nproposed recurrent attention units offers a rich joint embedding of visual and\ntextual features and enables the model to reason relations between several\nparts of the image and question. Our single model outperforms the first place\nwinner on the VQA 1.0 dataset, performs within margin to the current\nstate-of-the-art ensemble model. We also experiment with replacing attention\nmechanisms in other state-of-the-art models with our implementation and show\nincreased accuracy. In both cases, our recurrent attention mechanism improves\nperformance in tasks requiring sequential or relational reasoning on the VQA\ndataset.",
-                "tag": "[{'term': 'cs.AI', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CL', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.CV', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'cs.NE', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}, {'term': 'stat.ML', 'scheme': 'http://arxiv.org/schemas/atom', 'label': None}]",
-                "title": "Dual Recurrent Attention Units for Visual Question Answering",
-                "year": 2018}
-
+# Global variable used to store the text to vec representation of the random paper's summary
 random_result = {}
 
+# Download relevant NLTK model if not already present
 nltk.download('punkt')
 
 
@@ -37,6 +37,7 @@ def compute_random_paper_aspects():
     random_paper_summary = RANDOM_PAPER["summary"]
     random_paper_summary = random_paper_summary.replace("\n", " ")
     random_data = []
+
     # Iterate through each sentence in the random paper summary
     for i in sent_tokenize(random_paper_summary):
         temp = []
@@ -73,6 +74,7 @@ def compute_random_paper_aspects():
             num_dict[t[0]] = num_dict[t[0]] + t[1]
         else:
             num_dict[t[0]] = t[1]
+
     global random_result
     for k, v in random_paper_vector.items():
         if v in num_dict:
@@ -100,11 +102,10 @@ class SimilarPaperRecommendations(MRJob):
     def mapper_compute_cosine_similarity(self, paper_id, paper_summary):
         """
         This mapper computes the cosine similarity between a random paper (given)
-        and each paper in the JSON and yields the paper id, paper summary,
-        and the cosine similarity between this paper and the randomly given paper
+        and each paper in the JSON and yields the paper id, paper summary
         :param paper_id: unique id as defined in the input data
         :param paper_summary: corresponding paper summary
-        :return: ((paper_id, paper_summary), cosine_similarity)
+        :return: None, (cosine_similarity, (paper_id, paper_summary))
         """
 
         global random_result

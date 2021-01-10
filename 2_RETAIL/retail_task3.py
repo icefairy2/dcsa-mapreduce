@@ -1,10 +1,7 @@
-import sys
-from datetime import datetime
+import csv
 
 from mrjob.job import MRJob
 from mrjob.step import MRStep
-
-import csv
 
 
 class TopTenCustomers(MRJob):

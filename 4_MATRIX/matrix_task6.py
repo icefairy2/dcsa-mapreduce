@@ -4,7 +4,7 @@ import numpy as np
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 
-# ****** CONSTANTS *******
+# Constants regarding the input matrices
 A_NAME = 'A'
 A_ROWS = 1000
 A_COLUMNS = 50

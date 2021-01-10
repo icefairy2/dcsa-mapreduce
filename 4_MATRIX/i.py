@@ -1,5 +1,9 @@
 import numpy as np
 
+"""
+Use this script to generate input matrices and their cross product and save these data into separate files
+"""
+
 A = np.random.rand(1000, 50)
 
 B = np.random.rand(50, 2000)
